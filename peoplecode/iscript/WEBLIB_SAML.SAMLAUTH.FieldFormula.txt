@@ -1,0 +1,13 @@
+Function IScript_GetSAMLRedirectURL()
+   Local JavaObject &SAMLGenerator = GetJavaClass("saml.saml.ADFSSAMLRequestGen");
+   Local JavaObject &SAMLGenInstance = &SAMLGenerator.GetInstance();
+   Local string &req = &SAMLGenInstance.buildRequest();
+   If &req = "" Then
+      %Response.Write(&SAMLGenInstance.getLogData());
+      Return;
+   End-If;
+   Local string &url = &SAMLGenInstance.getDestination();
+   
+   %Response.Write(&url | "?SAMLRequest=" | &req);
+End-Function;
+

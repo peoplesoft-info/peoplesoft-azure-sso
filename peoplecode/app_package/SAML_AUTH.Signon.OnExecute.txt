@@ -1,0 +1,269 @@
+class Signon
+   method Signon(&inputPublicUser As string, &inputDefaultRedirectURL As string);
+   method generateSAMLAuthRequestURL() Returns string;
+   method failSignon(&reason As string);
+   method completeSignon(&userID As string, &redirectURL As string);
+   method getSAMLResponse(&samlXML As string) Returns XmlDoc;
+   method getSAMLXML() Returns string;
+   method validateSAMLSignature(&samlXML As string) Returns boolean;
+   method validateSAMLTimeframe(&samlResponse As XmlDoc) Returns boolean;
+   method getAttributeFor(&samlResponse As XmlDoc, &attributeName As string) Returns string;
+   method getUserIDFromSAMLResponse(&samlResponse As XmlDoc) Returns string;
+   method logMessage(&logLevel As integer, &logMessage As string);
+   method getRedirectURL() Returns string;
+   method getNameID(&samlResponse As XmlDoc) Returns string;
+   
+   method process();
+   
+protected
+   method convertJavaByteArrayToString(&javaArray As JavaObject) Returns string;
+   method convertJavaArrayToArray(&javaArray As JavaObject) Returns array of any;
+   
+   property string publicUser;
+   property string defaultRedirectURL;
+end-class;
+
+method getUserIDFromSAMLResponse
+   /+ &samlResponse as XmlDoc +/
+   /+ Returns String +/
+   /* This assumes Azure is configured to send the UPN as the name ID and a claim is configured for employeeid */
+   Local string &emplid = %This.getAttributeFor(&samlResponse, "employeeid");
+   Local string &upn = %This.getNameID(&samlResponse);
+   Local string &userID;
+   
+   Local string &upnWithoutDomain = Lower(Substring(&upn, 1, Find("@", &upn) - 1));
+   
+   Local number &userCount;
+   SQLExec("select count(*) from PSOPRDEFN where OPRID = :1", &upnWithoutDomain, &userCount);
+   If &userCount > 0 Then
+      &userID = &upnWithoutDomain;
+   Else
+      &userID = &emplid;
+   End-If;
+   
+   Return &userID;
+end-method;
+
+method Signon
+   /+ &inputPublicUser as String, +/
+   /+ &inputDefaultRedirectURL as String +/
+   %This.publicUser = &inputPublicUser;
+   %This.defaultRedirectURL = &inputDefaultRedirectURL;
+end-method;
+
+method generateSAMLAuthRequestURL
+   /+ Returns String +/
+   Local JavaObject &SAMLGenerator = GetJavaClass("saml.saml.ADFSSAMLRequestGen");
+   Local JavaObject &SAMLGenInstance = &SAMLGenerator.GetInstance();
+   Local string &req = &SAMLGenInstance.buildRequest();
+   If &req = "" Then
+      %This.logMessage(%ApplicationLogFence_Error, "Error generating AuthnRequest: " | &SAMLGenInstance.getLogData());
+      Return "";
+   End-If;
+   Return &SAMLGenInstance.getDestination() | "?SAMLRequest=" | &req;
+end-method;
+
+method failSignon
+   /+ &reason as String +/
+   %This.logMessage(%ApplicationLogFence_Level1, "Failing sign on because " | &reason);
+   rem SetAuthenticationResult( False, %SignonUserId, %This.generateSAMLAuthRequestURL(), False);
+   SetAuthenticationResult( False);
+end-method;
+
+method completeSignon
+   /+ &userID as String, +/
+   /+ &redirectURL as String +/
+   SetAuthenticationResult( True, &userID, &redirectURL, False);
+end-method;
+
+method getSAMLResponse
+   /+ &samlXML as String +/
+   /+ Returns XmlDoc +/
+   If &samlXML = "" Then
+      Return Null;
+   End-If;
+   
+   &samlXML = "<?xml version=""1.0"" ?>" | &samlXML;
+   Local XmlDoc &xmldoc = CreateXmlDoc(&samlXML);
+   
+   Return &xmldoc;
+end-method;
+
+method getSAMLXML
+   /+ Returns String +/
+   Local string &encodedResponse = %Request.GetParameter("SAMLResponse");
+   If &encodedResponse = "" Then
+      Return "";
+   End-If;
+   
+   Local JavaObject &oEncoder = CreateJavaObject("com.peoplesoft.tools.util.Base64");
+   Local string &decodeResult = %This.convertJavaByteArrayToString(&oEncoder.decode(&encodedResponse));
+   
+   If None(&decodeResult) Then
+      %This.logMessage(%ApplicationLogFence_Error, "Error decoding SAML XML response.");
+      Return "";
+   End-If;
+   
+   %This.logMessage(%ApplicationLogFence_Level1, "Decoded SAML XML: " | &decodeResult);
+   Return &decodeResult;
+end-method;
+
+method validateSAMLSignature
+   /+ &samlXML as String +/
+   /+ Returns Boolean +/
+   Local JavaObject &SAMLValidatorClass = GetJavaClass("saml.saml.ADFSSAMLResponseValidator");
+   Local JavaObject &SAMLValidator = &SAMLValidatorClass.GetInstance();
+   Local boolean &valid = &SAMLValidator.ValidateSAMLResponse(&samlXML);
+   %This.logMessage(%ApplicationLogFence_Level1, "Validation log data: " | &SAMLValidator.getLogData());
+   
+   Return &valid;
+end-method;
+
+method validateSAMLTimeframe
+   /+ &samlResponse as XmlDoc +/
+   /+ Returns Boolean +/
+   /* Verify conditions if they exist */
+   Local integer &i;
+   Local array of XmlNode &xmlNodes = &samlResponse.GetElementsByTagName("Conditions");
+   For &i = 1 To &xmlNodes.Len
+      If &xmlNodes [&i].GetAttributeValue("NotOnOrAfter") <> "" Then
+         Local datetime &validBefore = DateTimeValue(ISOToDateTime(&xmlNodes [&i].GetAttributeValue("NotOnOrAfter")));
+         If %Datetime >= &validBefore Then
+            %This.logMessage(%ApplicationLogFence_Error, "SAML validated, but was too old: " | &xmlNodes [&i].GetAttributeValue("NotOnOrAfter"));
+            Return False;
+         End-If;
+      End-If;
+      If &xmlNodes [&i].GetAttributeValue("NotBefore") <> "" Then
+         Local datetime &validAfter = DateTimeValue(ISOToDateTime(&xmlNodes [&i].GetAttributeValue("NotBefore")));
+         If %Datetime < &validAfter Then
+            %This.logMessage(%ApplicationLogFence_Error, "SAML validated, but was too far into the future: " | &xmlNodes [&i].GetAttributeValue("NotBefore"));
+            Return False;
+         End-If;
+      End-If;
+   End-For;
+   
+   Return True;
+end-method;
+
+method getAttributeFor
+   /+ &samlResponse as XmlDoc, +/
+   /+ &attributeName as String +/
+   /+ Returns String +/
+   Local integer &i;
+   Local array of XmlNode &xmlNodes = &samlResponse.GetElementsByTagName("Attribute");
+   Local array of string &validAttributes = CreateArrayRept("", 0);
+   For &i = 1 To &xmlNodes.Len
+      Local string &attrName = &xmlNodes [&i].GetAttributeValue("Name");
+      &validAttributes.Push(&attrName);
+      If &attrName = &attributeName Then
+         Local array of XmlNode &xmlNode2 = &xmlNodes [&i].GetElementsByTagName("AttributeValue");
+         Local string &value = &xmlNode2 [1].NodeValue;
+         %This.logMessage(%ApplicationLogFence_Level1, "Found attribute " | &attributeName | " with value " | &value);
+         Return &value;
+      End-If;
+   End-For;
+   
+   %This.logMessage(%ApplicationLogFence_Error, "Cannot find attribute " | &attributeName | ", valid values are: " | &validAttributes.Join(", "));
+   Return "";
+end-method;
+
+method getNameID
+   /+ &samlResponse as XmlDoc +/
+   /+ Returns String +/
+   Local array of XmlNode &xmlNodes = &samlResponse.GetElementsByTagName("NameID");
+   Return &xmlNodes [1].NodeValue;
+end-method;
+
+method process
+   
+   %This.logMessage(%ApplicationLogFence_Level2, "Signon code called from URI " | %Request.FullURI);
+   %This.logMessage(%ApplicationLogFence_Level2, "Signon code called with user " | %SignonUserId);
+   
+   /* Check if Login Successful and Public User */
+   If %PSAuthResult = True And
+         %SignonUserId = %This.publicUser Then
+      
+      /* Check if a SAML response exists */
+      Local string &xml = %This.getSAMLXML();
+      If &xml = "" Then
+         /* Do not fail sign on here, we must allow guest access if no SAML auth is attempted */
+         %This.logMessage(%ApplicationLogFence_Level2, "No SAML response found, or SAML failed to decode, not setting authentication result");
+         Return;
+      End-If;
+      
+      Local XmlDoc &samlResponse = %This.getSAMLResponse(&xml);
+      If &samlResponse = Null Then
+         %This.failSignon("failed to parse the XML");
+         Return;
+      End-If;
+      
+      Local boolean &isValid;
+      &isValid = %This.validateSAMLSignature(&xml);
+      If Not &isValid Then
+         %This.failSignon("failed to verify the SAML signature");
+         Return;
+      End-If;
+      
+      &isValid = %This.validateSAMLTimeframe(&samlResponse);
+      If Not &isValid Then
+         %This.failSignon("failed to verify the SAML timeframe");
+         Return;
+      End-If;
+      
+      Local string &userID = %This.getUserIDFromSAMLResponse(&samlResponse);
+      If &userID = "" Then
+         %This.failSignon("failed to identify an OPRID from the SAML response");
+         Return;
+      End-If;
+      
+      %This.completeSignon(&userID, %This.getRedirectURL());
+   End-If;
+end-method;
+
+method getRedirectURL
+   /+ Returns String +/
+   Local string &redirectURL = %Request.GetParameter("RelayState");
+   If &redirectURL = "" Then
+      &redirectURL = %This.defaultRedirectURL;
+   End-If;
+   
+   Return &redirectURL;
+end-method;
+
+method logMessage
+   /+ &logLevel as Integer, +/
+   /+ &logMessage as String +/
+   /* WriteToLog has a limit of about 4,000 characters. We need to chunk the log message if it's too large to see the full message */
+   Local array of string &logLines = ChunkText(&logMessage, "", 3950);
+   Local integer &i;
+   For &i = 1 To &logLines.Len
+      WriteToLog(&logLevel, &logLines [&i]);
+   End-For;
+end-method;
+
+method convertJavaByteArrayToString
+   /+ &javaArray as JavaObject +/
+   /+ Returns String +/
+   Local array of any &convertedByteArray = %This.convertJavaArrayToArray(&javaArray);
+   Local string &output = "";
+   Local integer &i;
+   
+   For &i = 1 To &convertedByteArray.Len
+      &output = &output | Char(&convertedByteArray [&i]);
+   End-For;
+   
+   Return &output;
+end-method;
+
+method convertJavaArrayToArray
+   /+ &javaArray as JavaObject +/
+   /+ Returns Array of Any +/
+   Local array of any &convertedByteArray = CreateArrayAny();
+   If &javaArray.length > 0 Then
+      &convertedByteArray [&javaArray.length] = Null;
+      CopyFromJavaArray(&javaArray, &convertedByteArray);
+   End-If;
+   
+   Return &convertedByteArray;
+end-method;
+

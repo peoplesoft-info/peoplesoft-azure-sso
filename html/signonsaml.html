@@ -1,0 +1,66 @@
+<HTML>
+<body>
+<div>
+Redirecting, please wait...
+</div>
+<iframe id='logout' style='display: none;'>
+</iframe>
+<script type='text/javascript'>
+	var site = "ps";
+	var portal = "EMPLOYEE";
+	var node = "HRMS";
+	
+	var newURL = "";
+	
+	var xhr = new XMLHttpRequest();
+	xhr.open("GET", "/psc/" + site + "/" + portal + "/" + node + "/s/WEBLIB_SAML.SAMLAUTH.FieldFormula.IScript_GetSAMLRedirectURL", true);
+	xhr.onreadystatechange = function() {
+		if (this.readyState == 4) {
+			// Typical action to be performed when the document is ready:
+			if (this.responseText.substring(0, 8) == "https://") {			
+				newURL = this.responseText;
+				window.location.href = newURL;
+				setTimeout(invokeSignout, 1);
+			} else {
+				document.write("Error initiating single signon request");
+			}
+		}
+	};
+	xhr.send(); 
+	
+	var logoutIframe = document.getElementById('logout');
+	function invokeSignout() {
+		logoutIframe.src = "/psp/" + site + "/" + portal + "/" + node + "/?cmd=logout";
+		
+		logoutIframe.addEventListener('load', function () {
+			redirect();
+		});
+	}
+	
+	function getRelayState() {
+		var relayURL = "";
+		var currentLocation = window.location.href;
+		if (currentLocation.indexOf("/c/") > -1 || currentLocation.indexOf("/s/") > -1) {
+			var queryStringPos = currentLocation.indexOf("?");
+			if (queryStringPos > -1) {
+				relayURL = currentLocation.substring(0, queryStringPos);
+			} else {
+				relayURL = currentLocation;
+			}
+		}
+				
+		if (relayURL != "") {		
+			return "&RelayState=" + relayURL;
+		} else {
+			return "";
+		}
+	}
+	
+	function redirect() {
+		/* Purge any cookies that Javascript has access to, probably just the JSESSIONID cookie */
+		document.cookie.split(";").forEach(function(c) { document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); });
+		window.location.href = newURL + getRelayState();
+	}
+</script>
+</body>
+</HTML>

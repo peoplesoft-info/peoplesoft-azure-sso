@@ -1,0 +1,9 @@
+import SAML_AUTH:Signon;
+
+Function SAMLAuthentication()
+   /* Do not use relative paths (such as ..) for the default redirect URL! */
+   /* The constructor requires the public user ID first, then the default redirect URL next, if the user was not deep linked to another page */
+   Local SAML_AUTH:Signon &signonClass = create SAML_AUTH:Signon("SAML_USER", "/psp/ps/EMPLOYEE/HRMS/h/?tab=DEFAULT");
+   &signonClass.process();
+End-Function;
+
