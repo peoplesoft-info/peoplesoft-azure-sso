@@ -487,12 +487,13 @@ for production because tokens can be forged.** See
 ## Error in classic homepage
 
 Authentication issues like
-> Error in service HomepageT, CREF with URL can not be found: /psc/<site>/<portal>/<node>/?tab=DEFAULT
-
+```
+Error in service HomepageT, CREF with URL can not be found: /psc/<site>/<portal>/<node>/?tab=DEFAULT
+```
 or a redirect to error code 129 or signon page with error message
-
-> UnAuthorized Token has been detected by the System. Please signon with your User ID and Password.
-
+```
+UnAuthorized Token has been detected by the System. Please signon with your User ID and Password.
+```
 is because PeopleSoft does not work with posting SAML directly to the classic 
 homepage. Use a different target/reply URL such as the fluid home page then
 redirect to the classic home page after authentication success.
