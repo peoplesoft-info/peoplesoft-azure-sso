@@ -70,7 +70,7 @@ items are necessary for Azure, the Identifier/Entity ID and the Reply URL or
 Assertion Consumer Service URL. You may pick anything for the entity ID, but
 be sure to remember the value as PeopleSoft will need to know it.
 
-![Azure setup screenshot](images/Azure setup 1.png)
+![Azure setup screenshot](images/Azure%20setup%201.png)
 
 The Reply URL will be the PeopleSoft target page. Do not use the login page
 (i.e. any page with ?cmd=login in the URL) as this will result in an infinite
@@ -289,7 +289,7 @@ around line 130. The following are valid values:
  * TRANSIENT
  * ENCRYPTED
 
-The [SAML signature validator class](java/src/main/java/saml/saml/ADFSSAMLRequestGen.java)
+The [SAML signature validator class](java/src/main/java/saml/saml/ADFSSAMLResponseValidator.java)
 reads a metadata XML file from the identity provider to validate any SAML
 responses. Depending upon your identity provider, you may need to change the
 code around line 149 where it loops over `getIDPSSODescriptor`. For ADFS,
@@ -535,7 +535,11 @@ persidus dot com.
 
 Find a way to reliably determine the site/portal/node for generating the
 IScript/signout URLs in the signon HTML template so they do not need to
-be configured for each environment within the HTML file.
+be configured for each environment within the HTML file. 
+
+OAuth 2 support appears to be built into recent versions of PeopleTools. There
+may be a way of utilizing it for SSO support for any OAuth2 capable identity
+provider such as Azure.
 
 # Credits
 
