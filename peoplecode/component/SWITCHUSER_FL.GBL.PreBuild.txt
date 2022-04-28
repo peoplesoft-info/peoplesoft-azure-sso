@@ -1,0 +1,3 @@
+import PT_PAGE_UTILS:Utils;
+
+(create PT_PAGE_UTILS:Utils()).SetDefaultViewport();

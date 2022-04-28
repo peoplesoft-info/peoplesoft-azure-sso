@@ -1,0 +1,23 @@
+import SAML_AUTH:*;
+
+class Factory
+   method getSignonClass() Returns SAML_AUTH:Signon;
+   method getOptionsClass() Returns SAML_AUTH:CustomSignonInterface;
+   method getCommonsClass() Returns SAML_AUTH:CommonInterface;
+end-class;
+
+method getSignonClass
+   /+ Returns SAML_AUTH:Signon +/
+   Return create SAML_AUTH:Signon(%This.getOptionsClass(), %This.getCommonsClass());
+end-method;
+
+method getOptionsClass
+   /+ Returns SAML_AUTH:CustomSignonInterface +/
+   Return create SAML_AUTH:CustomSignonOptions(%This.getCommonsClass());
+end-method;
+
+method getCommonsClass
+   /+ Returns SAML_AUTH:CommonInterface +/
+   Return create SAML_AUTH:BasicCommonFunctions();
+end-method;
+

@@ -1,0 +1,16 @@
+import SAML_AUTH:Operator;
+import SAML_AUTH:SAMLAuthData;
+
+interface CustomSignonInterface
+   /* Do not use relative paths (such as ..) for the default redirect URL! */
+   method getDefaultRedirectURL(&authData As SAML_AUTH:SAMLAuthData) Returns string;
+   method getAuthDataFromResponse(&samlResponse As XmlDoc) Returns SAML_AUTH:SAMLAuthData;
+   method getValidOPRIDsForSAMLData(&authData As SAML_AUTH:SAMLAuthData) Returns array of SAML_AUTH:Operator;
+   method auditUserSwitch(&authData As SAML_AUTH:SAMLAuthData, &oldUser As string, &newUser As string);
+   method getUserSelectionURL() Returns string;
+   method getPublicUser() Returns string;
+   method shouldShowUserSelection(&authData As SAML_AUTH:SAMLAuthData) Returns boolean;
+   /* If true the switch will be allowed even if it's not in the list of valid OPRIDs */
+   method allowUserSwitchOverride(&authData As SAML_AUTH:SAMLAuthData, &oldUser As string, &newUser As string) Returns boolean;
+end-interface;
+

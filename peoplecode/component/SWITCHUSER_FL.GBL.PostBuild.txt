@@ -1,0 +1,39 @@
+import SAML_AUTH:*;
+
+Local SAML_AUTH:Factory &factory = create SAML_AUTH:Factory();
+Local SAML_AUTH:Signon &objSignon = &factory.getSignonClass();
+
+Local array of SAML_AUTH:Operator &objValidUsers = &objSignon.getValidOPRIDsForSAMLData();
+
+AddStyleSheet(StyleSheet.SWUSER_FLUID_STYLES);
+
+Local number &i;
+Local Field &fld = GetLevel0()(1).SWTCHUSR_DV.GetField(Field.OPRID);
+Local string &dropDownDescr;
+
+If &objSignon.shouldShowUserSelection() Then
+   SWTCHUSR_DV.GROUPBOX.Visible = True;
+   SWTCHUSR_DV.GROUPBOX1.Visible = False;
+   
+   &fld.ClearDropDownList();
+   For &i = 1 To &objValidUsers.Len
+      &dropDownDescr = "";
+      If &objValidUsers [&i].acctLock Then
+         &dropDownDescr = "ACCOUNT LOCKED - ";
+      End-If;
+      &dropDownDescr = &dropDownDescr | &objValidUsers [&i].oprid | " - " | &objValidUsers [&i].description;
+      
+      &fld.AddDropDownItem(&objValidUsers [&i].oprid, &dropDownDescr);
+      
+      If %UserId = &objValidUsers [&i].oprid Then
+         &fld.Value = &objValidUsers [&i].oprid;
+      End-If;
+   End-For;
+Else
+   SWTCHUSR_DV.GROUPBOX.Visible = False;
+   SWTCHUSR_DV.GROUPBOX1.Visible = True;
+   
+   Local string &newUrl = &objSignon.getRedirectURL();
+   
+   ViewURL(&newUrl, False);
+End-If;

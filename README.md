@@ -228,10 +228,10 @@ page.
 **Make sure to modify the HTML to suit your environment**. Near the top of the
 HTML in the script tag are three variables: `site`, `portal`, and `node`. These
 must be updated to match your environment. They can be gleaned from the URL
-when you are logged in normally as the URL normally is `https://domain.tld/psp/
-<site name>/<portal name>/<node name>/<content reference>`. I was not able to
-reliably determine these variables from either the URL or from variables passed
-into the signon template by the PIA server.
+when you are logged in normally as the URL normally is
+`https://domain.tld/psp/<site name>/<portal name>/<node name>/<content reference>`.
+I was not able to reliably determine these variables from either the URL or
+from variables passed into the signon template by the PIA server.
 
 ## IScript for Auth Request
 
@@ -250,7 +250,7 @@ I created a derived/work record `FUNCLIB_SAML` and added the custom field
 the SAML validation code](peoplecode/record/FUNCLIB_SAML.SAMLAUTH.FieldDefault.txt),
 which I put into an application package `SAML_AUTH:Signon`.
 
-[Within the application package PeopleCode](peoplecode/app_package/SAML_AUTH.Signon.OnExecute.txt),
+[Within the application package PeopleCode](peoplecode/app_package/SAML_AUTH.Signon.OnExecute%20%28no%20user%20switch%29.txt),
 I invoked some Java code to validate the SAML signature, then I validate any
 relevant timestamps to limit replay attacks and log the user in given data
 found within the SAML response. **You must change the function
@@ -393,6 +393,57 @@ lcsrf_token=<matching any value contained within a lcsrftoken cookie sent along 
 
 However, doing this is outside the scope of this document.
 
+# Service/Shared Accounts
+
+If your environment has accounts that are shared among multiple people, an
+OPRID choosing page can be constructed. The signon PeopleCode will need to be
+updated to allow switching users without knowing any passwords. Because the
+signon PeopleCode is called on switch user, the code can override the lack of
+a password to allow the switch user to succeed anyway if the user can have
+access to switch to the shared user before moving on.
+
+First, the signon PeopleCode must be configured to run on auth fail. This is
+because when the `SwitchUser` function is called, the password for the user
+will not be known, so an empty string will be passed for the password. The
+signon PeopleCode can then override the normal failure with a success if the
+user is authorized to act as the new user.
+
+![Signon PeopleCode Setup For User Switching](images/PeopleSoft%20signon%20peoplecode%20setup%20with%20user%20switching.png)
+
+Be sure to restart the application server after making this change, or it will
+not take effect!
+
+A new page will need to be created to allow switching users. Then, the signon
+PeopleCode will redirect to the switcher page only if it needs to be shown.
+Once the user selects their desired operator ID, then final redirect to the
+deep link destination can happen if the switch was successful. Don't issue
+a `SwitchUser` call if they select the "default" user they are currently
+logged in as since the call will fail with the error:
+
+> SwitchUser failed.  New User Id is the same as the current User Id.
+
+The Signon PeopleCode will need reconfigured to check for the `SwitchUser`
+case. `%PSAuthResult` will be false because the password is not known and the
+`%SignOnUser` will be the user they are attempting to log in as. Check
+permissions against saved data (perhaps via a global variable) to see if the
+current user is allowed to switch to the new user. If so, you can issue a
+`SetAuthenticationResult(TRUE)` call to allow the switch user even if the
+password is incorrect.
+
+## Prebuilt project
+
+Load the [PeopleSoft project](ps%20project/SAML_AUTH/SAML_AUTH.XML) into
+Application Designer and customize or implement a new class to replace the
+`SAML_AUTH:CustomSignonOptions` class to fit your environment. If you create
+a new class, update `SAML_AUTH:Factory` to point to your new class. You will
+also want to update `SAML_AUTH:SAMLAuthData` to match what data you will pull
+from the SAML. You will have to publish the component to a menu and add
+permissions to all users to the switch user component.
+
+This project just contains some sample Signon PeopleCode and an example user
+switcher page. You must still do all of the PeopleSoft configuration and setup
+as noted in this document.
+
 # Troubleshooting
 
 There are a lot of pieces to this integration and any number of things can go
@@ -450,6 +501,20 @@ changes.
 
 You may need to portal security sync after changing sites.
 
+## Signon PeopleCode does not appear to run
+
+If you are getting no logs, and logs are configured properly in `psappsrv.cfg`,
+(see above) and the signon code is correctly configured, the problem may be
+invalid syntax somewhere in the signon PeopleCode. When errors of any kind
+happen during signon PeopleCode execution, the application server will silently
+abort running any of the rest of the code and will assume no login happens and
+will continue to use the guest user. You may wish to wrap the signon code in
+a try/catch block to log any errors, otherwise there will be no information.
+
+Also note that any changes to Signon Peoplecode configuration requires an
+application server restart (it never hurts to restart web server along with the
+app server).
+
 ## Bypass SP initiated SAML request
 
 When first working on SAML SSO, start with testing identity provider (Azure)
@@ -506,6 +571,13 @@ accessed by the guest user. This likely means that the signout frame within the
 `signonsaml.html` did not successfully process. Ensure the guest user has
 appropriate access to the sign out page (`?cmd=logout`).
 
+I have also seen setups or cases where I had to make the code issue a
+`SetAuthenticationResult(FALSE)` to force the login page to show when there is
+no XML data. However, you must be careful to not issue any authentication
+result when the guest user accesses the iScript to get the `AuthnRequest` data.
+So make sure to check that the current request URI is not the iScript otherwise
+you will get an error that it cannot initiate the SAML request.
+
 ## Classic homepage issues
 
 If the classic homepage does not load properly, make sure the redirect URL
@@ -521,6 +593,20 @@ origin of your identity provider.
 If you get error code 129: `UnAuthorized Token has been detected by the System.
 Please signon with your User ID and Password.`, check the portal servlet logs
 mentioned in [Troubleshooting](#troubleshooting).
+
+## Branding does not show after deep linking
+
+After signon when going directly to a non-home page URL, if the branding does
+not appear and the buttons are invisible, change the code so it redirects to
+`/psp/<site>/<portal>/<node>/s/WEBLIB_PTBR.ISCRIPT1.FieldFormula.IScript_StartPage?URL=`
+and then the final URL. This iScript should fix the branding not coming
+through. Note that this will only work for classic pages, fluid pages will not
+show and it will instead dump you to the classic homepage.
+
+The cause appears to be the macroset not properly loading on the very first
+page. One way around this I found was to always redirect to a fluid page that
+will redirect to your final destination by calling `ViewURL` in the component
+PreBuild or PostBuild code while showing a nice redirecting message.
 
 # Possible Improvements
 

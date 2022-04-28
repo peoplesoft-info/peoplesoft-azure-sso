@@ -1,0 +1,128 @@
+import SAML_AUTH:CustomSignonInterface;
+import SAML_AUTH:Operator;
+import SAML_AUTH:Signon;
+import SAML_AUTH:CommonInterface;
+import SAML_AUTH:SAMLAuthData;
+
+class CustomSignonOptions implements SAML_AUTH:CustomSignonInterface
+   /* Do not use relative paths (such as ..) for the default redirect URL! */
+   method getDefaultRedirectURL(&authData As SAML_AUTH:SAMLAuthData) Returns string;
+   method getAuthDataFromResponse(&samlResponse As XmlDoc) Returns SAML_AUTH:SAMLAuthData;
+   method getValidOPRIDsForSAMLData(&authData As SAML_AUTH:SAMLAuthData) Returns array of SAML_AUTH:Operator;
+   method auditUserSwitch(&authData As SAML_AUTH:SAMLAuthData, &oldUser As string, &newUser As string);
+   method getUserSelectionURL() Returns string;
+   method getPublicUser() Returns string;
+   method shouldShowUserSelection(&authData As SAML_AUTH:SAMLAuthData) Returns boolean;
+   /* If true the switch will be allowed even if it's not in the list of valid OPRIDs */
+   method allowUserSwitchOverride(&authData As SAML_AUTH:SAMLAuthData, &oldUser As string, &newUser As string) Returns boolean;
+   
+   method CustomSignonOptions(&inputCommon As SAML_AUTH:CommonInterface);
+private
+   instance SAML_AUTH:CommonInterface &common;
+end-class;
+
+method CustomSignonOptions
+   /+ &inputCommon as SAML_AUTH:CommonInterface +/
+   &common = &inputCommon;
+end-method;
+
+method getDefaultRedirectURL
+   /+ &authData as SAML_AUTH:SAMLAuthData +/
+   /+ Returns String +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.getDefaultRedirectURL +/
+   /* Do not use relative paths (such as ..) for the default redirect URL! */
+
+   Return "/psp/ps/EMPLOYEE/HRMS/h/?tab=DEFAULT";
+end-method;
+
+method getAuthDataFromResponse
+   /+ &samlResponse as XmlDoc +/
+   /+ Returns SAML_AUTH:SAMLAuthData +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.getAuthDataFromResponse +/
+   Local string &emplid = &common.getAttributeFor(&samlResponse, "employeeid");
+   Local string &isSW = &common.getAttributeFor(&samlResponse, "is_sw");
+   Local string &upn = &common.getNameID(&samlResponse);
+   
+   Local SAML_AUTH:SAMLAuthData &authData = create SAML_AUTH:SAMLAuthData();
+   &authData.upn = &upn;
+   &authData.emplid = &emplid;
+   &authData.isSW = (&isSW = "1");
+   
+   Return &authData;
+end-method;
+
+method getValidOPRIDsForSAMLData
+   /+ &authData as SAML_AUTH:SAMLAuthData +/
+   /+ Returns Array of SAML_AUTH:Operator +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.getValidOPRIDsForSAMLData +/
+   Local array of SAML_AUTH:Operator &output = CreateArrayRept(create SAML_AUTH:Operator(), 0);
+   If &authData = Null Then
+      &common.logMessage(%ApplicationLogFence_Error, "No SAML data to determine valid OPRIDs");
+      Return &output;
+   End-If;
+   
+   Local string &isSW = "0";
+   If &authData.isSW Then
+      &isSW = "1";
+   End-If;
+   
+   Local array of any &data = CreateArrayAny();
+   /* Create an SQL to fetch all authorized OPRIDs for the given SAML data */
+   Local SQL &validOprids = GetSQL(SQL.SAML_AUTH_OPRIDS, &authData.upn, &authData.emplid, &isSW);
+   While &validOprids.Fetch(&data)
+      Local SAML_AUTH:Operator &opr = create SAML_AUTH:Operator();
+      &opr.oprid = &data [1];
+      &opr.emplid = &data [2];
+      &opr.acctLock = (&data [3] = "1");
+      &opr.description = &data [4];
+      &opr.sortOrder = &data [5];
+      &common.logMessage(%ApplicationLogFence_Level2, "Valid OPRID: " | &opr.oprid);
+      &output.Push(&opr);
+   End-While;
+   
+   &common.logMessage(%ApplicationLogFence_Level1, "Found " | String(&output.Len) | " OPRIDs for input " | &authData.toString());
+   Return &output;
+end-method;
+
+method auditUserSwitch
+   /+ &authData as SAML_AUTH:SAMLAuthData, +/
+   /+ &oldUser as String, +/
+   /+ &newUser as String +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.auditUserSwitch +/
+   Local Record &rec = CreateRecord(Record.AUDIT_USER_SIGN);
+   &rec.AUDIT_STAMP.Value = %Datetime;
+   &rec.SAML_USER.Value = &authData.upn;
+   &rec.EMPLID.Value = &authData.emplid;
+   &rec.OPRID.Value = &oldUser;
+   &rec.OPRID_TO.Value = &newUser;
+   If Not &rec.Insert() Then
+      &common.logMessage(%ApplicationLogFence_Error, "Could not audit user switch to OPRID " | &newUser | " for UPN " | &rec.SAML_USER.Value | ".");
+   End-If;
+end-method;
+
+method getUserSelectionURL
+   /+ Returns String +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.getUserSelectionURL +/
+   Return "/psc/ps/EMPLOYEE/HRMS/c/SWITCHUSER.SWITCHUSER_FL.GBL";
+end-method;
+
+method getPublicUser
+   /+ Returns String +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.getPublicUser +/
+   Return "SAML_USER";
+end-method;
+
+method shouldShowUserSelection
+   /+ &authData as SAML_AUTH:SAMLAuthData +/
+   /+ Returns Boolean +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.shouldShowUserSelection +/
+   Return &authData.isSW;
+end-method;
+
+method allowUserSwitchOverride
+   /+ &authData as SAML_AUTH:SAMLAuthData, +/
+   /+ &oprid as String +/
+   /+ Returns Boolean +/
+   /+ Extends/implements SAML_AUTH:CustomSignonInterface.allowUserSwitchOverride +/
+   Return False;
+end-method;

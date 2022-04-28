@@ -1,0 +1,51 @@
+import SAML_AUTH:CommonInterface;
+
+class BasicCommonFunctions implements SAML_AUTH:CommonInterface
+   method getAttributeFor(&samlResponse As XmlDoc, &attributeName As string) Returns string;
+   method logMessage(&logLevel As integer, &logMessage As string);
+   method getNameID(&samlResponse As XmlDoc) Returns string;
+end-class;
+
+method getAttributeFor
+   /+ &samlResponse as XmlDoc, +/
+   /+ &attributeName as String +/
+   /+ Returns String +/
+   /+ Extends/implements SAML_AUTH:CommonInterface.getAttributeFor +/
+   Local integer &i;
+   Local array of XmlNode &xmlNodes = &samlResponse.GetElementsByTagName("Attribute");
+   Local array of string &validAttributes = CreateArrayRept("", 0);
+   For &i = 1 To &xmlNodes.Len
+      Local string &attrName = &xmlNodes [&i].GetAttributeValue("Name");
+      &validAttributes.Push(&attrName);
+      If &attrName = &attributeName Then
+         Local array of XmlNode &xmlNode2 = &xmlNodes [&i].GetElementsByTagName("AttributeValue");
+         Local string &value = &xmlNode2 [1].NodeValue;
+         %This.logMessage(%ApplicationLogFence_Level1, "Found attribute " | &attributeName | " with value " | &value);
+         Return &value;
+      End-If;
+   End-For;
+   
+   %This.logMessage(%ApplicationLogFence_Error, "Cannot find attribute " | &attributeName | ", valid values are: " | &validAttributes.Join(", "));
+   Return "";
+end-method;
+
+method logMessage
+   /+ &logLevel as Integer, +/
+   /+ &logMessage as String +/
+   /+ Extends/implements SAML_AUTH:CommonInterface.logMessage +/
+   /* WriteToLog has a limit of about 4,000 characters. We need to chunk the log message if it's too large to see the full message */
+   Local array of string &logLines = ChunkText(&logMessage, "", 3950);
+   Local integer &i;
+   For &i = 1 To &logLines.Len
+      WriteToLog(&logLevel, &logLines [&i]);
+   End-For;
+end-method;
+
+method getNameID
+   /+ &samlResponse as XmlDoc +/
+   /+ Returns String +/
+   /+ Extends/implements SAML_AUTH:CommonInterface.getNameID +/
+   Local array of XmlNode &xmlNodes = &samlResponse.GetElementsByTagName("NameID");
+   Return &xmlNodes [1].NodeValue;
+end-method;
+

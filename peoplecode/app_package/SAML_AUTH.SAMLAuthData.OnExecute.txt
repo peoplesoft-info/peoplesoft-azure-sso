@@ -1,0 +1,18 @@
+class SAMLAuthData
+   property string upn;
+   property string emplid;
+   property boolean isSW;
+   
+   method toString() Returns string;
+end-class;
+
+method toString
+   /+ Returns String +/
+   Local string &output = %This.upn | " " | %This.emplid;
+   If %This.isSW Then
+      &output = " SW";
+   End-If;
+   
+   Return &output;
+end-method;
+

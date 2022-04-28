@@ -1,0 +1,17 @@
+import SAML_AUTH:*;
+
+Local SAML_AUTH:Factory &factory = create SAML_AUTH:Factory();
+Local SAML_AUTH:Signon &objSignon = &factory.getSignonClass();
+
+Local boolean &ret;
+If SWTCHUSR_DV.OPRID.Value <> %UserId Then
+   &ret = SwitchUser(SWTCHUSR_DV.OPRID.Value, "", "", "");
+Else
+   &ret = True;
+End-If;
+
+If &ret Then
+   Local string &newUrl = &objSignon.getRedirectURL();
+   
+   ViewURL(&newUrl, False);
+End-If;

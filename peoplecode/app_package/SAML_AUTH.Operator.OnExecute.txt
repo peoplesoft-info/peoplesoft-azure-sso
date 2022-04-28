@@ -1,0 +1,8 @@
+class Operator
+   property string oprid;
+   property string emplid;
+   property boolean acctLock;
+   property string description;
+   property number sortOrder;
+end-class;
+

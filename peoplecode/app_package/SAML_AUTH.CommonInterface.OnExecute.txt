@@ -1,0 +1,6 @@
+interface CommonInterface
+   method getAttributeFor(&samlResponse As XmlDoc, &attributeName As string) Returns string;
+   method logMessage(&logLevel As integer, &logMessage As string);
+   method getNameID(&samlResponse As XmlDoc) Returns string;
+end-interface;
+
