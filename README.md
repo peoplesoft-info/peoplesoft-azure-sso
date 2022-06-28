@@ -48,6 +48,35 @@ I developed and tested the code on the Windows platform on PeopleTools 8.59.
 I additionally added code to generate a SAML authentication request for SP
 initiated SSO support.
 
+# Setup Checklist
+
+These are the steps required to set up SAML SSO on any PeopleSoft environment:
+
+1. Copy the project or manually create the signon peoplecode and related pages and
+iScripts for SP initiated signon and user switching.
+2. Modify the application package `SAML_AUTH:CustomSignonOptions` to reflect
+your environment. If using the simplified code, customize the `FUNCLIB_SAML`
+PeopleCode.
+3. Build all records for auditing or selecting users.
+4. Register any components/pages needed for signon, e.g. user selection pages
+5. [Set up Azure](#azure-setup) for the two properties: Reply Assertion URL
+(fluid homepage) and the entity ID.
+6. Create the [guest user](#user-profile-configuration).
+7. Configure the [signon PeopleCode](#signon-peoplecode-configuration).
+8. Copy an existing web profile in use by PIA or create a new one and
+[configure](#web-profile-configuration).
+9. Install custom signinsaml.html and signout.html pages into PIA. ([Customize
+for the environment](#sign-on-html-files))
+10. Configure PIA to use the new web profile.
+11. [Install the SAML JAR](#saml-java-code) into the application server.
+12. Install the configuration file in the directory that is embedded/hard-coded
+within the JAR file.
+13. [Update the configuration file](#java-code-configuration) to use the
+information from Azure.
+14. Restart APPSRV and PIA processes.
+15. Clear browser cookies and cache.
+16. Test and [troubleshoot](#troubleshooting).
+
 # IdP Initiated SAML Process
 
 ## Overview
