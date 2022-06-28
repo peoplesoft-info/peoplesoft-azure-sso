@@ -617,6 +617,14 @@ does not contain relative path items such as `..`.
 Make sure the web profile is set up to allow CORS and Framable from the
 origin of your identity provider.
 
+## Error code 127
+
+There are many possibilities that causes signon error code 127. If there are
+no errors in the logs (tracesql or APPSRV), check that any relevant user
+switching pages are registered as that may be the cause. A browser network
+trace will likely show a signout right before the redirect to the user
+switching page if the component is not registered.
+
 ## Error code 129
 
 If you get error code 129: `UnAuthorized Token has been detected by the System.
