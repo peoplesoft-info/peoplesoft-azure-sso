@@ -133,9 +133,8 @@ Be sure to save the metadata URL for use later in the [Java setup](#java-code-co
 
 ### User Profile Configuration
 Create a new user profile to be used as a guest user (if your environment
-does not have one already). This user only needs two roles [^1]:
- * The built-in role `Standard Non-Page Permissions` for sign out access
- * A new role for IScript access (see the [iScript setup section](#iscript-for-auth-request))
+does not have one already). This user only needs one role [^1]: A new role for
+IScript access (see the [iScript setup section](#iscript-for-auth-request))
 
 ![Add a new User Profile for guest access](images/PeopleSoft%20guest%20user%20setup%201.png)
 
@@ -143,9 +142,15 @@ Make sure there is no ID specified for the guest user.
 
 ![ID tab of guest User Profile](images/PeopleSoft%20guest%20user%20setup%202.png)
 
-I only set two roles on the guest user.
+I only set the one custom role on the guest user.
 
 ![Roles tab of guest User Profile](images/PeopleSoft%20guest%20user%20setup%203.png)
+
+You may see a warning about a symbolic ID that does not exist if you chose to
+leave it blank. This is OK to ignore and is likely more secure to have no
+symbolic ID on the guest user.
+
+![Missing symbolic ID warning](images/PeopleSoft%20guest%20user%20setup%204.png)
 
 ### Web Profile Configuration
 

@@ -2718,7 +2718,7 @@
         <fFlags>0</fFlags>
         <fAuxFlagMask>0</fAuxFlagMask>
         <nFieldCount>1</nFieldCount>
-        <eRecType>0</eRecType>
+        <eRecType>2</eRecType>
         <fRecUse>0</fRecUse>
         <cOptTrigFlag>N</cOptTrigFlag>
         <szAuditRecName></szAuditRecName>
