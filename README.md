@@ -630,6 +630,12 @@ switching pages are registered as that may be the cause. A browser network
 trace will likely show a signout right before the redirect to the user
 switching page if the component is not registered.
 
+If you get error 127 as a redirect on the signout when viewed in the brower's
+network tab of the developer console, and the SAML never seems to process
+(such that you get authorization errors on the homepage and no logs appear),
+double check that [the signon PeopleCode](#signon-peoplecode-configuration)
+is properly configured.
+
 ## Error code 129
 
 If you get error code 129: `UnAuthorized Token has been detected by the System.
