@@ -478,6 +478,68 @@ This project just contains some sample Signon PeopleCode and an example user
 switcher page. You must still do all of the PeopleSoft configuration and setup
 as noted in this document.
 
+### A note on SQL SAML_AUTH_OPRIDS
+
+This SQL object is not included in the project because it is unique to each
+installation. The purpose of the SQL is to pull a list of OPRIDs given
+information from Azure and is very specific to each install, depending on what
+is stored for each user related to PeopleSoft within Azure.
+
+For example, if you store PeopleSoft's EMPLID for each Azure user, you'd need
+some SQL to pull the OPRIDs for a given EMPLID, like this:
+
+```sql
+select
+    OPRID,
+    EMPLID,
+    ACCTLOCK,
+    OPRDEFNDESC,
+    1 as SORTORDER
+from
+    PSOPRDEFN
+where
+    EMPLID = :1
+order by SORTORDER, OPRID, ACCTLOCK
+```
+
+Or, in the case of PeopleSoft containing OPRIDs related to an Azure UPN, you
+might have something like the following SQL:
+
+```sql
+select
+    opr.OPRID,
+    opr.EMPLID,
+    opr.ACCTLOCK,
+    opr.OPRDEFNDESC,
+    1 as SORTORDER
+from
+    PSOPRDEFN opr
+    join PS_UPN_OPRID_TBL upntbl on (upntbl.OPRID = opr.OPRID)
+where
+    upntbl.UPN = :1
+order by opr.SORTORDER, opr.OPRID, opr.ACCTLOCK
+```
+
+This would require a custom UPN_OPRID_TBL to be created that contains the link
+between Azure UPN to PeopleSoft OPRID, if this is the route you choose.
+
+Other installations may require a combination of the above, or other datapoints
+from Azure claims. The SQL will need to be tailored correctly for each
+installation which only you can determine will work best for your situation.
+
+### Code customizations related to this SQL
+
+After creating the SQL to match your situation, you will then need to modify
+`SAML_AUTH:CustomSignonOptions.getAuthDataFromResponse()` to pull what you need
+from Azure claims and modify
+`SAML_AUTH:CustomSignonOptions.getValidOPRIDsForSAMLData()` to pass the correct
+bind variables to the SQL and parse the correct columns from the SQL.
+The data transfer object `SAML_AUTH:SAMLAuthData` can be modified to store the
+Azure data you parse/pull out with the `getAuthDataFromResponse` method.
+
+The sort order should be something sorted in the SQL if order matters to your
+situation. The delivered code does not do anything with sort order.
+
 # Troubleshooting
 
 There are a lot of pieces to this integration and any number of things can go
