@@ -19,7 +19,7 @@ Redirecting, please wait...
 			// Typical action to be performed when the document is ready:
 			if (this.responseText.substring(0, 8) == "https://") {			
 				newURL = this.responseText;
-				window.location.href = newURL;
+				window.location.href = newURL + getRelayState();
 				setTimeout(invokeSignout, 1);
 			} else {
 				document.write("Error initiating single signon request");
