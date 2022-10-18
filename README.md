@@ -674,6 +674,11 @@ result when the guest user accesses the iScript to get the `AuthnRequest` data.
 So make sure to check that the current request URI is not the iScript otherwise
 you will get an error that it cannot initiate the SAML request.
 
+If you see an error page, ensure that the `Signon Error Page` field in the Web
+Profile "Look and Feel" tab is set to your saml signon page and not an error
+HTML page. Review [Web Profile Configuration](#web-profile-configuration) to
+make sure you have completed all of the steps.
+
 ## Classic homepage issues
 
 If the classic homepage does not load properly, make sure the redirect URL
