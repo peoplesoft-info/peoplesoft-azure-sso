@@ -48,6 +48,9 @@ I developed and tested the code on the Windows platform on PeopleTools 8.59.
 I additionally added code to generate a SAML authentication request for SP
 initiated SSO support.
 
+These steps have been confirmed to work for PeopleTools 8.58 so long as you
+use the `java-8.58` folder. Everything else will work as mentioned.
+
 # Setup Checklist
 
 These are the steps required to set up SAML SSO on any PeopleSoft environment:
@@ -308,7 +311,7 @@ I used the OpenSAML 4 java library for validating SAML signatures and
 generating SAML requests. Yes, I know the names I gave it is a misnomer since
 it's not specific to ADFS, but for Azure.
 
-The [request generator class](java/src/main/java/saml/saml/ADFSSAMLRequestGen.java)
+The [request generator class](java-pt8.59/src/main/java/saml/saml/ADFSSAMLRequestGen.java)
 defaults to an unspecified NameID policy which should cause Azure to use the
 default. If this does not apply to your environment, you may wish to change it
 around line 130. The following are valid values:
@@ -323,7 +326,7 @@ around line 130. The following are valid values:
  * TRANSIENT
  * ENCRYPTED
 
-The [SAML signature validator class](java/src/main/java/saml/saml/ADFSSAMLResponseValidator.java)
+The [SAML signature validator class](java-pt8.59/src/main/java/saml/saml/ADFSSAMLResponseValidator.java)
 reads a metadata XML file from the identity provider to validate any SAML
 responses. Depending upon your identity provider, you may need to change the
 code around line 149 where it loops over `getIDPSSODescriptor`. For ADFS,
@@ -336,6 +339,15 @@ class. I'm certain you will need to change it to suit your environment. It is
 near the top of each file:
 
 > properties.load(new FileInputStream("c:/psft/cfg/saml/saml.properties"));
+
+### PT 8.58 Java code
+
+Thanks to Brent Torgerson who modified the code for PeopleTools 8.58. The idea
+is the same except the Java version it targets matches 8.58, and it uses an
+environment variable to know the location of the `saml.properties` file instead
+of hard-coding the path. If you use the 8.58 Java code without changing it,
+make sure to set the `SAML_CONFIG` environment variable to point to the
+location of the `saml.properties` file.
 
 ### Compiling
 
@@ -367,17 +379,21 @@ Make sure the path separators are valid for your platform, `;` for Windows, or
 `:` for Linux machines otherwise you may get an error about the Java class not
 being found.
 
-I have provided a [pre-compiled source JAR for Windows](java/bin/saml-1.0.0.jar)
+I have provided a [pre-compiled source JAR for Windows](java-pt8.59/bin/saml-1.0.0.jar)
 with a hard coded path of `c:/psft/cfg/saml/saml.properties` for testing
 purposes. ***Do not use this JAR on production***. Please compile your own to
 suit your needs. This pre-compiled JAR targets the Java version for PeopleTools
 8.59.
 
+The [pre-compiled source JAR for PeopleTools 8.58](java-pt8.58/bin/saml-1.0.0.jar)
+will work as long as you set the environment variable `SAML_CONFIG` to point to
+the location of your `saml.properties` file.
+
 ### Java code configuration
 
 The Java code must be configured to match your environment. A file should be
 created in the location defined in the Java code (the `saml.properties`
-reference). [An example file is provided](java/config/saml.properties). 
+reference). [An example file is provided](java-pt8.59/config/saml.properties). 
 
 The file is a simple `key=value` separated by new lines. These keys must exist:
 * `federationUrl` - This will be the metadata URL that Azure will give you
@@ -754,6 +770,7 @@ This work would not have been possible without the following people:
     * https://pe0ples0ft.blogspot.com/2015/04/conditional-redirect-in-signon.html
 * Dan Iverson for how check token works:
     * https://psadmin.io/2017/10/25/understanding-the-check-token-id-in-peopletools-8-56/
+* Brent Torgerson for getting the Java code to work for PeopleTools 8.58.
 
 # Contact
 
