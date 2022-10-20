@@ -758,6 +758,83 @@ OAuth 2 support appears to be built into recent versions of PeopleTools. There
 may be a way of utilizing it for SSO support for any OAuth2 capable identity
 provider such as Azure.
 
+## SP initiated signon without an iScript
+
+If you can figure it out (perhaps if you are using a PeopleTools version that
+works), there is a minor adjustment you can make so that the guest user does
+not need any access and the signon HTML can be a simple redirect instead of
+attempting to call an iScript and calling a logout.
+
+Modify the signonsaml.html file so the line
+```javascript
+var newURL = "";
+```
+
+is changed to 
+
+```javascript
+var newURL = "<%=error%>";
+
+if (newURL.substring(0, 8) == "https://") {
+    window.location.href = newURL + getRelayState();
+} else {
+    document.write("Error initiating single signon request");
+}
+```
+
+and all of these lines can be removed:
+```javascript
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", "/psc/" + site + "/" + portal + "/" + node + "/s/WEBLIB_SAML.SAMLAUTH.FieldFormula.IScript_GetSAMLRedirectURL", true);
+    xhr.onreadystatechange = function() {
+        if (this.readyState == 4) {
+            // Typical action to be performed when the document is ready:
+            if (this.responseText.substring(0, 8) == "https://") {
+                urlLoaded = true;
+                newURL = this.responseText;
+                //window.location.href = newURL + getRelayState();
+                checkRedirect();
+                setTimeout(invokeSignout, 1);
+            } else {
+                document.write("Error initiating single signon request");
+            }
+        }
+    };
+    xhr.send();
+```
+
+The only other thing you'd need to do is modify the method `failSignon` of
+the `SAML_AUTH:Signon` application package PeopleCode.
+
+```
+method failSignon
+   /+ &reason as String +/
+   %This.common.logMessage(%ApplicationLogFence_Level1, "Failing sign on because " | &reason);
+   Local JavaObject &SAMLGenerator = GetJavaClass("saml.saml.ADFSSAMLRequestGen");
+   Local JavaObject &SAMLGenInstance = &SAMLGenerator.GetInstance();
+   Local string &req = &SAMLGenInstance.buildRequest();
+   Local string &url;
+   If &req = "" Then
+      &url = &SAMLGenInstance.getLogData();
+   Else
+      &url = &SAMLGenInstance.getDestination() | "?SAMLRequest=" | &req;
+   End-If;
+
+   SetAuthenticationResult(False, %UserID, &url);
+end-method;
+```
+
+You can then remove security to the iScript WEBLIB_SAML or delete it entirely.
+The service provider initiated signon handshake should now be a very simple
+redirect to the identity provider without the need for calling iScripts and
+logging back out.
+
+I was unable to get this to work on PeopleTools 8.59, but it might work on
+a different tools platform version. It did not work because the URL data was
+not passed to the signonsaml.html in the `<%=error%>` tag, necessitating the
+use of an iScript to get the data and a logout so the signon SAML will process
+the POSTed XML coming back to PeopleSoft from the identity provider.
+
 # Credits
 
 This work would not have been possible without the following people:
