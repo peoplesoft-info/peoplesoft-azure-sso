@@ -13,7 +13,7 @@
         document.cookie = "ps_dest=" + window.location.href + "; Path=/; SameSite=Strict; Secure";
         window.location.href = "/psp/" + site + "/" + portal + "/" + node + "/c/NUI_FRAMEWORK.PT_LANDINGPAGE.GBL";
     }
-    else if (redirectURL.substring(0, 8) === "https://" || redirectURL.substring(0, 7) === "ERROR: ") {
+    else if (redirectURL.substring(0, 7) !== "ERROR: ") {
         window.location.href = redirectURL + getRelayState();
     } else {
         document.write(redirectURL);
