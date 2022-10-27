@@ -9,11 +9,11 @@
     var node = "HRMS";
 
     var redirectURL = "<%=error%>";
-    if (redirectURL === "") {
+    if (redirectURL === "" || (redirectURL.substring(0, 8) !== "https://" && redirectURL.substring(0, 7) !== "ERROR: ")) {
         document.cookie = "ps_dest=" + window.location.href + "; Path=/; SameSite=Strict; Secure";
         window.location.href = "/psp/" + site + "/" + portal + "/" + node + "/c/NUI_FRAMEWORK.PT_LANDINGPAGE.GBL";
     }
-    else if (redirectURL.substring(0, 7) !== "ERROR: ") {
+    else if (redirectURL.substring(0, 8) === "https://") {
         window.location.href = redirectURL + getRelayState();
     } else {
         document.write(redirectURL);
