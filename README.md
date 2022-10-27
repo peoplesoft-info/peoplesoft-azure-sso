@@ -35,10 +35,10 @@ based on data from the SAML response. Some Java code is used to validate the
 SAML signature.
 
 For Service Provider/SP-initiated SAML authentication, I modified the sign on
-HTML to call a guest IScript that calls Java code to generate the SAML
-authentication request (`AuthnRequest`) and redirect to the identity provider,
-saving the current URL in the IdP redirect as the Relay State so PeopleSoft
-knows where to redirect back upon authentication to support deep linking.
+HTML to redirect to the identity provider through the provided authentication
+request (`AuthnRequest`), saving the current URL in the IdP redirect as the
+Relay State so PeopleSoft knows where to redirect back upon authentication to
+support deep linking.
 
 ## Platform
 
@@ -136,8 +136,7 @@ Be sure to save the metadata URL for use later in the [Java setup](#java-code-co
 
 ### User Profile Configuration
 Create a new user profile to be used as a guest user (if your environment
-does not have one already). This user only needs one role [^1]: A new role for
-IScript access (see the [iScript setup section](#iscript-for-auth-request))
+does not have one already). This user needs no security.
 
 ![Add a new User Profile for guest access](images/PeopleSoft%20guest%20user%20setup%201.png)
 
@@ -145,7 +144,7 @@ Make sure there is no ID specified for the guest user.
 
 ![ID tab of guest User Profile](images/PeopleSoft%20guest%20user%20setup%202.png)
 
-I only set the one custom role on the guest user.
+There are no roles for this user.
 
 ![Roles tab of guest User Profile](images/PeopleSoft%20guest%20user%20setup%203.png)
 
@@ -231,7 +230,9 @@ Go to PeopleTools > Security > Security Objects > Signon PeopleCode. Add a new
 row and type in the record where the PeopleCode exists. See
 [Signon PeopleCode](#signon-peoplecode) for more information. Exec Auth Fail
 should not be enabled because there is no SAML to validate if a normal
-user/password authentication request fails.
+user/password authentication request fails. If you are using shared or service
+accounts that multiple people use, modify the setup as mentioned in
+[Service/Shared Accounts](#serviceshared-accounts).
 
 ![Signon PeopleCode Setup](images/PeopleSoft%20signon%20peoplecode%20setup.png)
 
@@ -242,14 +243,16 @@ Two HTML files need to be created in
 I created [signonsaml.html](html/signonsaml.html) and
 [signout.html](html/signout.html).
 
-The signon HTML opens an XmlHttpRequest to an IScript to get the redirect URL
-for initiating the SAML signon procedure. This is only needed for SP initiated
+The signon HTML uses the error property to know where to redirect the user to.
+The signon PeopleCode will issue a `SetAuthentiationResult(False)` call
+with the generated authentication request. This is only needed for SP initiated
 SAML single sign on processes. You can use the default login HTML form if you
-only want to use Azure-initiated SAML. After getting the redirect URL, the user
-is logged in as a guest, so the HTML must initiate the signout process so the
-SAML response will be processed, otherwise the user will be greeted with a not
-authorized error message since they are logged in as a guest and the sign on
-PeopleCode will not be called again when a user is logged in.
+only want to use Azure-initiated SAML. If the error property is not set, the
+Javascript within the HTML will redirect to a page that will cause the
+signon PeopleCode to fire. Do note that if you customize the HTML to go to
+a page that is not the fluid home page, the URL *must* start with `/psp`
+after the domain. Any `/psc` pages will not get the error text sent to the
+login HTML.
 
 In order to support deep linking, the Javascript in the HTML will store the
 current URL in the `RelayState` SAML authentication request URL so it will
@@ -268,17 +271,9 @@ must be updated to match your environment. They can be gleaned from the URL
 when you are logged in normally as the URL normally is
 `https://domain.tld/psp/<site name>/<portal name>/<node name>/<content reference>`.
 I was not able to reliably determine these variables from either the URL or
-from variables passed into the signon template by the PIA server.
-
-## IScript for Auth Request
-
-I created a derived/work record `WEBLIB_SAML` and a field `SAMLAUTH` inside.
-The [PeopleCode for the FieldFormula event](peoplecode/iscript/WEBLIB_SAML.SAMLAUTH.FieldFormula.txt)
-invokes some Java code to use OpenSAML to generate the redirect request. The
-code will output debug information if there are Java errors during the request
-generation.
-
-Remember to give the guest role access to this iScript.
+from variables passed into the signon template by the PIA server. You may also
+wish to change the redirect URL that the HTML goes to for retrieving the error
+string/redirect URL on line 14 of [signonsaml.html](html/signonsaml.html).
 
 ## Signon PeopleCode
 
@@ -424,10 +419,9 @@ or to the `saml.properties` file.
 
 # SP Initiated SAML Process
 
-The key here is the `signonsaml.html` file that requests the iScript to
-generate the redirect URL to hand off the SSO process to the identity provider.
-You may use the built-in `signon.html` if you want to use built-in
-authentication for other purposes.
+The key here is the `signonsaml.html` file that redirects to the identity
+provider to hand off the SSO process. You may use the built-in `signon.html` if
+you want to use built-in authentication for other purposes.
 
 # Non-SSO logins
 
@@ -677,23 +671,10 @@ redirect to the classic home page after authentication success.
 
 ## Deep linking does not work
 
-What happens when the deep linking/redirecting does not work? In other words,
-when someone gets "You are not authorized for this page" because it's being
-accessed by the guest user. This likely means that the signout frame within the
-`signonsaml.html` did not successfully process. Ensure the guest user has
-appropriate access to the sign out page (`?cmd=logout`).
-
-I have also seen setups or cases where I had to make the code issue a
-`SetAuthenticationResult(FALSE)` to force the login page to show when there is
-no XML data. However, you must be careful to not issue any authentication
-result when the guest user accesses the iScript to get the `AuthnRequest` data.
-So make sure to check that the current request URI is not the iScript otherwise
-you will get an error that it cannot initiate the SAML request.
-
 If you see an error page, ensure that the `Signon Error Page` field in the Web
 Profile "Look and Feel" tab is set to your saml signon page and not an error
 HTML page. Review [Web Profile Configuration](#web-profile-configuration) to
-make sure you have completed all of the steps.
+make sure you have completed all the steps.
 
 ## Classic homepage issues
 
@@ -712,12 +693,6 @@ no errors in the logs (tracesql or APPSRV), check that any relevant user
 switching pages are registered as that may be the cause. A browser network
 trace will likely show a signout right before the redirect to the user
 switching page if the component is not registered.
-
-If you get error 127 as a redirect on the signout when viewed in the brower's
-network tab of the developer console, and the SAML never seems to process
-(such that you get authorization errors on the homepage and no logs appear),
-double check that [the signon PeopleCode](#signon-peoplecode-configuration)
-is properly configured.
 
 ## Error code 129
 
@@ -741,15 +716,6 @@ PreBuild or PostBuild code while showing a nice redirecting message.
 
 # Possible Improvements
 
-I could not figure out how to reliably get the authentication request URL to be
-passed to the sign on page via the `<%=error%>` variable, causing the need to
-call a guest IScript to determine the URL. This part requires a guest login
-and as such, in order for the Sign on PeopleCode to fire, a logout needs to
-happen after the IScript request. This causes the sign on page to do a lot
-more than it really needs to do. If anyone knows how to get the URL to send
-directly to the sign on code, please drop me a line peoplesoft-azure-sso at
-persidus dot com.
-
 Find a way to reliably determine the site/portal/node for generating the
 IScript/signout URLs in the signon HTML template so they do not need to
 be configured for each environment within the HTML file. 
@@ -757,83 +723,6 @@ be configured for each environment within the HTML file.
 OAuth 2 support appears to be built into recent versions of PeopleTools. There
 may be a way of utilizing it for SSO support for any OAuth2 capable identity
 provider such as Azure.
-
-## SP initiated signon without an iScript
-
-If you can figure it out (perhaps if you are using a PeopleTools version that
-works), there is a minor adjustment you can make so that the guest user does
-not need any access and the signon HTML can be a simple redirect instead of
-attempting to call an iScript and calling a logout.
-
-Modify the signonsaml.html file so the line
-```javascript
-var newURL = "";
-```
-
-is changed to 
-
-```javascript
-var newURL = "<%=error%>";
-
-if (newURL.substring(0, 8) == "https://") {
-    window.location.href = newURL + getRelayState();
-} else {
-    document.write("Error initiating single signon request");
-}
-```
-
-and all of these lines can be removed:
-```javascript
-    var xhr = new XMLHttpRequest();
-    xhr.open("GET", "/psc/" + site + "/" + portal + "/" + node + "/s/WEBLIB_SAML.SAMLAUTH.FieldFormula.IScript_GetSAMLRedirectURL", true);
-    xhr.onreadystatechange = function() {
-        if (this.readyState == 4) {
-            // Typical action to be performed when the document is ready:
-            if (this.responseText.substring(0, 8) == "https://") {
-                urlLoaded = true;
-                newURL = this.responseText;
-                //window.location.href = newURL + getRelayState();
-                checkRedirect();
-                setTimeout(invokeSignout, 1);
-            } else {
-                document.write("Error initiating single signon request");
-            }
-        }
-    };
-    xhr.send();
-```
-
-The only other thing you'd need to do is modify the method `failSignon` of
-the `SAML_AUTH:Signon` application package PeopleCode.
-
-```
-method failSignon
-   /+ &reason as String +/
-   %This.common.logMessage(%ApplicationLogFence_Level1, "Failing sign on because " | &reason);
-   Local JavaObject &SAMLGenerator = GetJavaClass("saml.saml.ADFSSAMLRequestGen");
-   Local JavaObject &SAMLGenInstance = &SAMLGenerator.GetInstance();
-   Local string &req = &SAMLGenInstance.buildRequest();
-   Local string &url;
-   If &req = "" Then
-      &url = &SAMLGenInstance.getLogData();
-   Else
-      &url = &SAMLGenInstance.getDestination() | "?SAMLRequest=" | &req;
-   End-If;
-
-   SetAuthenticationResult(False, %UserID, &url);
-end-method;
-```
-
-You can then remove security to the iScript WEBLIB_SAML or delete it entirely.
-The service provider initiated signon handshake should now be a very simple
-redirect to the identity provider without the need for calling iScripts and
-logging back out.
-
-I was unable to get this to work on PeopleTools 8.59, but it might work on
-a different tools platform version. It did not work because the URL data was
-not passed to the signonsaml.html in the `<%=error%>` tag, necessitating the
-use of an iScript to get the data and a logout so the signon SAML will process
-the POSTed XML coming back to PeopleSoft from the identity provider.
 
 # Credits
 

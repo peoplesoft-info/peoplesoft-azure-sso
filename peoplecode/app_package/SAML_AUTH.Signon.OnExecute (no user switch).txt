@@ -51,23 +51,22 @@ method Signon
    %This.defaultRedirectURL = &inputDefaultRedirectURL;
 end-method;
 
-method generateSAMLAuthRequestURL
-   /+ Returns String +/
-   Local JavaObject &SAMLGenerator = GetJavaClass("saml.saml.ADFSSAMLRequestGen");
-   Local JavaObject &SAMLGenInstance = &SAMLGenerator.GetInstance();
-   Local string &req = &SAMLGenInstance.buildRequest();
-   If &req = "" Then
-      %This.logMessage(%ApplicationLogFence_Error, "Error generating AuthnRequest: " | &SAMLGenInstance.getLogData());
-      Return "";
-   End-If;
-   Return &SAMLGenInstance.getDestination() | "?SAMLRequest=" | &req;
-end-method;
 
 method failSignon
    /+ &reason as String +/
-   %This.logMessage(%ApplicationLogFence_Level1, "Failing sign on because " | &reason);
-   rem SetAuthenticationResult( False, %SignonUserId, %This.generateSAMLAuthRequestURL(), False);
-   SetAuthenticationResult( False);
+   %This.common.logMessage(%ApplicationLogFence_Level1, "Failing sign on because " | &reason);
+
+   Local JavaObject &SAMLGenerator = GetJavaClass("saml.saml.ADFSSAMLRequestGen");
+   Local JavaObject &SAMLGenInstance = &SAMLGenerator.GetInstance();
+   Local string &req = &SAMLGenInstance.buildRequest();
+   Local string &url;
+   If &req = "" Then
+      &url = "ERROR: " | &SAMLGenInstance.getLogData();
+   Else
+      &url = &SAMLGenInstance.getDestination() | "?SAMLRequest=" | &req;
+   End-If;
+
+   SetAuthenticationResult( False, %UserId, &url);
 end-method;
 
 method completeSignon
@@ -186,8 +185,8 @@ method process
       /* Check if a SAML response exists */
       Local string &xml = %This.getSAMLXML();
       If &xml = "" Then
-         /* Do not fail sign on here, we must allow guest access if no SAML auth is attempted */
          %This.logMessage(%ApplicationLogFence_Level2, "No SAML response found, or SAML failed to decode, not setting authentication result");
+         %This.failSignon("Deep link attempted, forcing signon");
          Return;
       End-If;
       
