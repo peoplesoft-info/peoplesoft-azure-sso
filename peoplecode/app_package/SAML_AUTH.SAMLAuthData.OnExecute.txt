@@ -10,7 +10,7 @@ method toString
    /+ Returns String +/
    Local string &output = %This.upn | " " | %This.emplid;
    If %This.isSW Then
-      &output = " SW";
+      &output = &output | " SW";
    End-If;
    
    Return &output;
