@@ -51,6 +51,8 @@ initiated SSO support.
 These steps have been confirmed to work for PeopleTools 8.58 so long as you
 use the `java-8.58` folder. Everything else will work as mentioned.
 
+The PeopleTools 8.59 Java code will work just fine with PeopleTools 8.60.
+
 # Setup Checklist
 
 These are the steps required to set up SAML SSO on any PeopleSoft environment:
@@ -58,27 +60,29 @@ These are the steps required to set up SAML SSO on any PeopleSoft environment:
 1. Copy the project or manually create the signon peoplecode and related pages and
 iScripts for SP initiated signon and user switching.
 2. Modify the application package `SAML_AUTH:CustomSignonOptions` to reflect
-your environment. If using the simplified code, customize the `FUNCLIB_SAML`
-PeopleCode.
-3. Build all records for auditing or selecting users.
-4. Register any components/pages needed for signon, e.g. user selection pages
-5. [Set up Azure](#azure-setup) for the two properties: Reply Assertion URL
+your environment. If using the simplified code (no user switch version), customize
+the `FUNCLIB_SAML` PeopleCode instead.
+3. Create the `SAML_AUTH_OPRIDS` [SQL object](#a-note-on-sql-saml_auth_oprids)
+4. Build all records for auditing or selecting users.
+5. Register any components/pages needed for signon, e.g. user selection pages
+6. [Set up Azure](#azure-setup) for the two properties: Reply Assertion URL
 (fluid homepage) and the entity ID.
-6. Create the [guest user](#user-profile-configuration).
-7. Configure the [signon PeopleCode](#signon-peoplecode-configuration).
-8. Copy an existing web profile in use by PIA or create a new one and
+7. Create the [guest user](#user-profile-configuration).
+8. Configure the [signon PeopleCode](#signon-peoplecode-configuration).
+9. Copy an existing web profile in use by PIA or create a new one and
 [configure](#web-profile-configuration).
-9. Install custom signinsaml.html and signout.html pages into PIA. ([Customize
+10. Install custom signinsaml.html and signout.html pages into PIA. ([Customize
 for the environment](#sign-on-html-files))
-10. Configure PIA to use the new web profile.
-11. [Install the SAML JAR](#saml-java-code) into the application server.
-12. Install the configuration file in the directory that is embedded/hard-coded
-within the JAR file.
-13. [Update the configuration file](#java-code-configuration) to use the
+11. Configure PIA to use the new web profile.
+12. [Compile and Install the SAML JAR](#saml-java-code) into the application server.
+13. Install the configuration file in the directory that is embedded/hard-coded
+within the JAR file, or set the `SAML_CONFIG` environment variable if using the
+JAR configured for the environment variable.
+14. [Update the configuration file](#java-code-configuration) to use the
 information from Azure.
-14. Restart APPSRV and PIA processes.
-15. Clear browser cookies and cache.
-16. Test and [troubleshoot](#troubleshooting).
+15. Restart APPSRV and PIA processes.
+16. Clear browser cookies and cache.
+17. Test and [troubleshoot](#troubleshooting).
 
 # IdP Initiated SAML Process
 
@@ -335,6 +339,26 @@ near the top of each file:
 
 > properties.load(new FileInputStream("c:/psft/cfg/saml/saml.properties"));
 
+### PT 8.59 code without a hard-coded path
+
+If you want to use an environment variable to know the location of the
+`saml.properties` file instead of hard-coding the path, just change the one
+line:
+
+> properties.load(new FileInputStream("c:/psft/cfg/saml/saml.properties"));
+
+To this line:
+
+> properties.load(new FileInputStream(System.getenv("SAML_CONFIG")));
+
+In both of these files:
+* [ADFSSAMLRequestGen.java](java-pt8.59/src/main/java/saml/saml/ADFSSAMLRequestGen.java)
+* [ADFSSAMLResponseValidator.java](java-pt8.59/src/main/java/saml/saml/ADFSSAMLResponseValidator.java)
+
+And then [compile](#compiling). Make sure to set the `SAML_CONFIG` environment
+variable on your PeopleSoft Application Server to point to the location of the
+`saml.properties` file.
+
 ### PT 8.58 Java code
 
 Thanks to Brent Torgerson who modified the code for PeopleTools 8.58. The idea
@@ -348,8 +372,17 @@ location of the `saml.properties` file.
 
 To compile, download and install [Maven](https://maven.apache.org/download.cgi),
 then download and install the latest
-[JDK](https://www.oracle.com/java/technologies/downloads/). Do not download the
-JRE as you will get errors compiling. The file name should begin with `jdk`.
+[JDK](https://www.oracle.com/java/technologies/downloads/) on your client
+workstation, not on the PeopleSoft server. Do not download the JRE as you will
+get errors compiling. The file name should begin with `jdk`.
+
+You can copy the `java-pt8.59` or `java-pt8.58` directory (depending upon the
+version you are using) anywhere on your client workstation, but you must have the
+`src` directory structure and the xml files in the root of the java folder. The
+`bin` and `config` folders can be removed before compiling as they are not used
+nor read during compile. The `java-pt8.59` or `java-pt8.58` folder (which you may
+rename to anything) is where you will run the maven command below which will read
+the XML files to know how to compile the code within the `src` directory.
 
 Open a terminal such as bash or powershell and change directories to the `java`
 subdirectory. Run `C:/maven/apache-maven-3.8.5/bin/mvn.cmd package` or whatever
@@ -713,6 +746,44 @@ The cause appears to be the macroset not properly loading on the very first
 page. One way around this I found was to always redirect to a fluid page that
 will redirect to your final destination by calling `ViewURL` in the component
 PreBuild or PostBuild code while showing a nice redirecting message.
+
+## Java error on line 128
+
+During signon processing, you may see the following log line in the logs:
+
+```
+java.lang.NullPointerException at saml.saml.ADFSSAMLResponseValidator.ValidateSAMLResponse(ADFSSAMLResponseValidator.java:128)
+```
+
+The likely cause behind this is an error creating an instance of the validator
+class. One possible problem could be a lack of write permissions to the
+metadata cache folder set up within the `saml.properties` file. To get more
+information on the problem, modify the `SAML_AUTH:Signon` PeopleCode function
+`validateSAMLSignature` by adding the following code line:
+
+> %This.common.logMessage(%ApplicationLogFence_Level1, "Instantiation log data: " | &SAMLValidator.getLogData());
+
+after the line
+
+> Local JavaObject &SAMLValidator = &SAMLValidatorClass.GetInstance();
+
+so that the end function looks like this:
+
+```
+method validateSAMLSignature
+   /+ &samlXML as String +/
+   /+ Returns Boolean +/
+   Local JavaObject &SAMLValidatorClass = GetJavaClass("saml.saml.ADFSSAMLResponseValidator");
+   Local JavaObject &SAMLValidator = &SAMLValidatorClass.GetInstance();
+   %This.common.logMessage(%ApplicationLogFence_Level1, "Instantiation log data: " | &SAMLValidator.getLogData());
+   Local boolean &valid = &SAMLValidator.ValidateSAMLResponse(&samlXML);
+   %This.common.logMessage(%ApplicationLogFence_Level1, "Validation log data: " | &SAMLValidator.getLogData());
+  
+   Return &valid;
+end-method;
+```
+
+After another login attempt, the logs should show you the problem.
 
 # Possible Improvements
 
