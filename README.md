@@ -428,7 +428,7 @@ The file is a simple `key=value` separated by new lines. These keys must exist:
 after setting up the SSO "app" for PeopleSoft. The tenant ID is the GUID or
 identifier after `login.microsoftonline.com`. The URL may look something like
 `https://login.microsoftonline.com/<azure tenant ID>/federationmetadata/2007-06/federationmetadata.xml?appid=<PS app ID>`.
-* `metadataCachePath` - This will be any folder where the application server
+* `metadataCachePath` - This should point to a file where the application server
 can write the metadata to for caching purposes to speed up validation.
 * `trustEntity` - For Azure, this is simply
 `https://sts.windows.net/<azure tenant ID>/` where `<azure tenant ID>` can be
