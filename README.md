@@ -80,9 +80,11 @@ within the JAR file, or set the `SAML_CONFIG` environment variable if using the
 JAR configured for the environment variable.
 14. [Update the configuration file](#java-code-configuration) to use the
 information from Azure.
-15. Restart APPSRV and PIA processes.
-16. Clear browser cookies and cache.
-17. Test and [troubleshoot](#troubleshooting).
+15. Verify that the [base timezone](#saml-validated-but-was-too-old) is
+set correctly.
+16. Restart APPSRV and PIA processes.
+17. Clear browser cookies and cache.
+18. Test and [troubleshoot](#troubleshooting).
 
 # IdP Initiated SAML Process
 
@@ -785,6 +787,23 @@ end-method;
 ```
 
 After another login attempt, the logs should show you the problem.
+
+## SAML validated, but was too old
+
+If the logs show that the SAML was validated but that it was too old (or
+too far in the future) check that the application server clock is set
+correctly and that the correct timezone is set in PSOPTIONS.
+
+You can use these SQL statements to help identify if the timezone is
+setup correctly within PeopleSoft:
+
+```sql
+select BSE_TIMEZONE from PSOPTIONS;
+select * from PSTIMEZONE where TIMEZONE = (select BSE_TIMEZONE from PSOPTIONS);
+```
+
+You can change the base timezone over at PeopleTools > Utilities >
+Administration > PeopleTools Options.
 
 # Possible Improvements
 
