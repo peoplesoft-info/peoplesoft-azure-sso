@@ -757,9 +757,10 @@ java.lang.NullPointerException at saml.saml.ADFSSAMLResponseValidator.ValidateSA
 
 The likely cause behind this is an error creating an instance of the validator
 class. One possible problem could be a lack of write permissions to the
-metadata cache folder set up within the `saml.properties` file. To get more
-information on the problem, modify the `SAML_AUTH:Signon` PeopleCode function
-`validateSAMLSignature` by adding the following code line:
+metadata cache file set up within the `saml.properties` file. (Or that a folder
+was specified instead of a file name.) To get more information on the problem,
+modify the `SAML_AUTH:Signon` PeopleCode function `validateSAMLSignature` by
+adding the following code line:
 
 > %This.common.logMessage(%ApplicationLogFence_Level1, "Instantiation log data: " | &SAMLValidator.getLogData());
 
