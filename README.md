@@ -48,10 +48,21 @@ I developed and tested the code on the Windows platform on PeopleTools 8.59.
 I additionally added code to generate a SAML authentication request for SP
 initiated SSO support.
 
-These steps have been confirmed to work for PeopleTools 8.58 so long as you
-use the `java-8.58` folder. Everything else will work as mentioned.
+The main difference between the java-8.58 and the java-8.59 variants at this
+point is mainly whether the config file path is hard-coded or pulled from an
+environment variable. You may use the 8.58 version for any PeopleTools
+version. You may use the java-8.59 version for any PeopleTools version by
+changing [line 83 of pom.xml](java-pt8.59/pom.xml#L83) to `1.8` instead of
+`11`. Any Java version may read a JAR compiled to an earlier version fine,
+but not a later version. So, it's fine to compile to Java version 1.8 and that
+should make it compatible with any PeopleTools version.
 
-The PeopleTools 8.59 Java code will work just fine with PeopleTools 8.60.
+To reiterate, the PeopleTools 8.58 Java code will work just fine with earlier
+and later PeopleTools versions, including 8.60+, just be sure to set the
+`SAML_CONFIG` environment variable on the application server to the full path
+of the `saml.properties` file. You may use the
+[pre-compiled binary](java-pt8.58/bin/saml-1.0.0.jar) for any PeopleTools
+version if you do not wish to compile it yourself.
 
 # Setup Checklist
 
